@@ -1,0 +1,50 @@
+require('dotenv').config();
+const Twit = require('twit');
+const axios = require('axios').default;
+
+console.log('Bot is working');
+
+const client = new Twit({
+    consumer_key: process.env.TWITTER_API_KEY,
+    consumer_secret: process.env.TWITTER_API_SECRET,
+    access_token: process.env.TWITTER_ACCESS_TOKEN,
+    access_token_secret: process.env.TWITTER_ACCESS_TOKEN_SECRET,
+    timeout_ms: 60 * 1000,  // optional HTTP request timeout to apply to all requests.
+    strictSSL: true,     // optional - requires SSL certificates to be valid.
+});
+
+const stream = client.stream('statuses/filter', { track: '@TheOfficeBotCo' });
+
+const getQuote = async () => {
+    const response = await axios.get('https://officeapi.dev/api/quotes/random');
+    const quote = `${await response.data.data.content} - ${await response.data.data.character.firstname}`;
+    return quote;
+};
+
+const quoteLimitChecked = async () => {
+    const quote = await getQuote();
+    if (quote.length <= 280){
+        return quote
+    }
+    else {return quoteLimitChecked();}
+};
+
+const postTweet = async () => {
+    client.post('statuses/update', { status: await quoteLimitChecked() }, function(err, data, response) {
+        console.log(`Sent tweet: ${data.text}`)
+      });
+};
+
+const postReply = async (event) => {
+    const user = event.user.screen_name; // getting @
+    const tweetId = event.id_str; // getting tweet id
+    client.post('statuses/update', { status: `@${user} ${await quoteLimitChecked()}`, in_reply_to_status_id: tweetId }, function (err, data, response) {
+        console.log(`Sent tweet to ${user}: ${data.text}`) // logging the outcome to see how it went
+    })
+};
+
+stream.on('tweet', postReply);
+
+postTweet();
+setInterval(postTweet, 7200000);
+
