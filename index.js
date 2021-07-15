@@ -22,23 +22,30 @@ const getQuote = async () => {
 };
 
 const quoteLimitChecked = async () => {
-    const quote = await getQuote();
-    if (quote.length <= 280){
-        return quote
+    let quote = await getQuote();
+
+    while (quote.length > 280){
+        console.log('Quote too long, getting another...');
+        quote = await getQuote();
     }
-    else {return quoteLimitChecked();}
+    console.log('Quote retrieved:', quote);
+    return quote
 };
 
 const postTweet = async () => {
-    client.post('statuses/update', { status: await quoteLimitChecked() }, function(err, data, response) {
+    let quoteToTweet = await quoteLimitChecked();
+
+    client.post('statuses/update', { status: quoteToTweet }, function(err, data, response) {
         console.log(`Sent tweet: ${data.text}`)
       });
 };
 
 const postReply = async (event) => {
+    let quoteToTweet = await quoteLimitChecked();
     const user = event.user.screen_name; // getting @
     const tweetId = event.id_str; // getting tweet id
-    client.post('statuses/update', { status: `@${user} ${await quoteLimitChecked()}`, in_reply_to_status_id: tweetId }, function (err, data, response) {
+
+    client.post('statuses/update', { status: `@${user} ${quoteToTweet}`, in_reply_to_status_id: tweetId }, function (err, data, response) {
         console.log(`Sent tweet to ${user}: ${data.text}`) // logging the outcome to see how it went
     })
 };
@@ -46,5 +53,4 @@ const postReply = async (event) => {
 stream.on('tweet', postReply);
 
 postTweet();
-setInterval(postTweet, 7200000);
-
+setInterval(postTweet, 1000 * 60 * 30);
